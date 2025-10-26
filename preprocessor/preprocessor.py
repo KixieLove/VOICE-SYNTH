@@ -74,17 +74,19 @@ class Preprocessor:
                 tg_path = os.path.join(
                     self.out_dir, "TextGrid", speaker, "{}.TextGrid".format(basename)
                 )
-                if os.path.exists(tg_path):
-                    ret = self.process_utterance(speaker, basename)
-                    if ret is None:
-                        continue
-                    else:
-                        info, pitch, energy, n = ret
-                    out.append(info)
+                if not os.path.exists(tg_path):
+                    continue
 
-                if len(pitch) > 0:
+                ret = self.process_utterance(speaker, basename)
+                if ret is None:
+                    continue
+
+                info, pitch, energy, n = ret
+                out.append(info)
+
+                if pitch is not None and len(pitch) > 0:
                     pitch_scaler.partial_fit(pitch.reshape((-1, 1)))
-                if len(energy) > 0:
+                if energy is not None and len(energy) > 0:
                     energy_scaler.partial_fit(energy.reshape((-1, 1)))
 
                 n_frames += n

@@ -9,6 +9,7 @@ runs/
 wandb/
 tensorboard/
 logs/
+preprocessed_data/
 
 # Big binaries anywhere
 *.wav
@@ -19,6 +20,8 @@ logs/
 *.ckpt
 *.bin
 *.onnx
+*.zip
+*.pth.tar
 
 # Python / env / editor
 __pycache__/

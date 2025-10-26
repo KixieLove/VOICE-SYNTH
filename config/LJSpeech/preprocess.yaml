@@ -1,16 +1,18 @@
 dataset: "LJSpeech"
 
 path:
-  corpus_path: "/home/fastspeech2/fs2es/data/angelina"
+  corpus_path: "./data/angelina"
   lexicon_path: "lexicon/new_spanish.txt"
   raw_path: "./raw_data/angelina"
-  preprocessed_path: "./preprocessed_data/LJSpeech"
+  preprocessed_path: "./preprocessed_data/angelina_aligned"
 
 preprocessing:
   val_size: 512
   text:
     text_cleaners: ["english_cleaners"]
     language: "en"
+    use_lexicon: True
+    use_cmudict: False
   audio:
     sampling_rate: 16000
     max_wav_value: 32767.0

@@ -85,8 +85,8 @@ def vocoder_infer(mels, vocoder, model_config, preprocess_config, lengths=None):
     ).astype("int16")
     wavs = [wav for wav in wavs]
 
-    for i in range(len(mels)):
-        if lengths is not None:
-            wavs[i] = wavs[i][: lengths[i]]
+  #  for i in range(len(mels)):
+   #     if lengths is not None:
+    #        wavs[i] = wavs[i][: lengths[i]]
 
     return wavs
