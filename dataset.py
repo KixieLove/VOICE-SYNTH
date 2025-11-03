@@ -25,6 +25,9 @@ class Dataset(Dataset):
             self.speaker_map = json.load(f)
         self.sort = sort
         self.drop_last = drop_last
+        self.pitch_feature  = preprocess_config["preprocessing"]["pitch"]["feature"]
+        self.energy_feature = preprocess_config["preprocessing"]["energy"]["feature"]
+
 
     def __len__(self):
         return len(self.text)
@@ -90,39 +93,49 @@ class Dataset(Dataset):
             return name, speaker, text, raw_text
 
     def reprocess(self, data, idxs):
-        ids = [data[idx]["id"] for idx in idxs]
-        speakers = [data[idx]["speaker"] for idx in idxs]
-        texts = [data[idx]["text"] for idx in idxs]
+        ids       = [data[idx]["id"]       for idx in idxs]
+        speakers  = [data[idx]["speaker"]  for idx in idxs]
+        texts     = [data[idx]["text"]     for idx in idxs]
         raw_texts = [data[idx]["raw_text"] for idx in idxs]
-        mels = [data[idx]["mel"] for idx in idxs]
-        pitches = [data[idx]["pitch"] for idx in idxs]
-        energies = [data[idx]["energy"] for idx in idxs]
+        mels      = [data[idx]["mel"]      for idx in idxs]
+        pitches   = [data[idx]["pitch"]    for idx in idxs]
+        energies  = [data[idx]["energy"]   for idx in idxs]
         durations = [data[idx]["duration"] for idx in idxs]
 
-        text_lens = np.array([text.shape[0] for text in texts])
-        mel_lens = np.array([mel.shape[0] for mel in mels])
+        import numpy as np
+        text_lens = np.array([t.shape[0] for t in texts])
+        mel_lens  = np.array([m.shape[0] for m in mels])
+
+        max_src_len = int(text_lens.max())
+        max_mel_len = int(mel_lens.max())
 
         speakers = np.array(speakers)
-        texts = pad_1D(texts)
-        mels = pad_2D(mels)
-        pitches = pad_1D(pitches)
-        energies = pad_1D(energies)
-        durations = pad_1D(durations)
+
+        # SIEMPRE: textos a fonemas y mels a frames
+        texts = pad_1D(texts, max_src_len)
+        mels  = pad_2D(mels,  max_mel_len)
+
+        # CLAVE: pad según nivel (phoneme_level -> max_src_len)
+        if self.pitch_feature == "phoneme_level":
+            pitches = pad_1D(pitches, max_src_len)
+        else:
+            pitches = pad_1D(pitches, max_mel_len)
+
+        if self.energy_feature == "phoneme_level":
+            energies = pad_1D(energies, max_src_len)
+        else:
+            energies = pad_1D(energies, max_mel_len)
+
+        # Durations siempre por fonema
+        durations = pad_1D(durations, max_src_len)
 
         return (
-            ids,
-            raw_texts,
-            speakers,
-            texts,
-            text_lens,
-            max(text_lens),
-            mels,
-            mel_lens,
-            max(mel_lens),
-            pitches,
-            energies,
-            durations,
+            ids, raw_texts, speakers,
+            texts, text_lens, max_src_len,
+            mels,  mel_lens,  max_mel_len,
+            pitches, energies, durations,
         )
+
 
     def collate_fn(self, data):
         data_size = len(data)

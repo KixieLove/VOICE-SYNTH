@@ -94,18 +94,25 @@ class Preprocessor:
         print("Computing statistic quantities ...")
         # Perform normalization if necessary
         if self.pitch_normalization:
-            pitch_mean = pitch_scaler.mean_[0]
-            pitch_std = pitch_scaler.scale_[0]
+            try:
+                pitch_mean = pitch_scaler.mean_[0]
+                pitch_std = pitch_scaler.scale_[0]
+            except AttributeError:
+                print("WARN: pitch scaler no se pudo ajustar (sin muestras). Uso (mean=0,std=1).")
+                pitch_mean, pitch_std = 0.0, 1.0
         else:
-            # A numerical trick to avoid normalization...
-            pitch_mean = 0
-            pitch_std = 1
+            pitch_mean, pitch_std = 0.0, 1.0
+
+        # Energy
         if self.energy_normalization:
-            energy_mean = energy_scaler.mean_[0]
-            energy_std = energy_scaler.scale_[0]
+            try:
+                energy_mean = energy_scaler.mean_[0]
+                energy_std = energy_scaler.scale_[0]
+            except AttributeError:
+                print("WARN: energy scaler no se pudo ajustar (sin muestras). Uso (mean=0,std=1).")
+                energy_mean, energy_std = 0.0, 1.0
         else:
-            energy_mean = 0
-            energy_std = 1
+            energy_mean, energy_std = 0.0, 1.0
 
         pitch_min, pitch_max = self.normalize(
             os.path.join(self.out_dir, "pitch"), pitch_mean, pitch_std
@@ -294,14 +301,23 @@ class Preprocessor:
         return phones, durations, start_time, end_time
 
     def remove_outlier(self, values):
-        values = np.array(values)
+        values = np.array(values, dtype=np.float32)
+        if values.size == 0:
+            return values
         p25 = np.percentile(values, 25)
         p75 = np.percentile(values, 75)
-        lower = p25 - 1.5 * (p75 - p25)
-        upper = p75 + 1.5 * (p75 - p25)
-        normal_indices = np.logical_and(values > lower, values < upper)
+        iqr = float(p75 - p25)
+        if iqr == 0.0:
+            # No hay dispersión: no filtres nada
+            return values
+        lower = p25 - 1.5 * iqr
+        upper = p75 + 1.5 * iqr
+        mask = np.logical_and(values >= lower, values <= upper)  # OJO: inclusivo
+        if not np.any(mask):
+            # Por seguridad, si todo se iría, devuelve el original
+            return values
+        return values[mask]
 
-        return values[normal_indices]
 
     def normalize(self, in_dir, mean, std):
         max_value = np.finfo(np.float64).min

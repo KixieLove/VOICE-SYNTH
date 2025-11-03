@@ -1,6 +1,6 @@
 path:
-  ckpt_path: "./output/ckpt/angelina"
-  log_path: "./output/log/angelina"
+  ckpt_path: "./output/ckpt/angelina22k"
+  log_path: "./output/log/angelina22k"
   result_path: "./output/result/angelina"
 optimizer:
   batch_size: 16
@@ -13,7 +13,7 @@ optimizer:
   anneal_steps: [30000, 40000, 50000]
   anneal_rate: 0.3
 step:
-  total_step: 90000
+  total_step: 300000
   log_step: 100
   synth_step: 1000
   val_step: 1000

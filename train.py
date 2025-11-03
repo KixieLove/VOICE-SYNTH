@@ -17,6 +17,23 @@ from evaluate import evaluate
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+def save_ckpt(ckpt_dir, step, epoch, model, optimizer):
+    os.makedirs(ckpt_dir, exist_ok=True)
+    to_save = model.module if hasattr(model, "module") else model
+    opt_obj = optimizer._optimizer if hasattr(optimizer, "_optimizer") else optimizer
+
+    payload = {
+        "model": to_save.state_dict(),
+        "optimizer": opt_obj.state_dict(),
+        "step": step,
+        "epoch": epoch,
+    }
+    tmp_path = os.path.join(ckpt_dir, f"{step}.pth.tar.tmp")
+    final_path = os.path.join(ckpt_dir, f"{step}.pth.tar")
+    torch.save(payload, tmp_path)
+    os.replace(tmp_path, final_path)  # escritura atómica en Windows
+
+
 
 def main(args, configs):
     print("Prepare training ...")
@@ -35,11 +52,17 @@ def main(args, configs):
         batch_size=batch_size * group_size,
         shuffle=True,
         collate_fn=dataset.collate_fn,
+        drop_last = True,                              # evita el último lote “cojo”
+        num_workers = 2,     # >0 en Windows
+        pin_memory = False,        # acelera H2D si devuelves tensores
+        persistent_workers = True,                     # no re-spawnea cada epoch
+        prefetch_factor = 2,       
     )
 
     # Prepare model
     model, optimizer = get_model(args, configs, device, train=True)
-    model = nn.DataParallel(model)
+    if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model) 
     num_param = get_param_num(model)
     Loss = FastSpeech2Loss(preprocess_config, model_config).to(device)
     print("Number of FastSpeech2 Parameters:", num_param)
@@ -149,16 +172,14 @@ def main(args, configs):
                     model.train()
 
                 if step % save_step == 0:
-                    torch.save(
-                        {
-                            "model": model.module.state_dict(),
-                            "optimizer": optimizer._optimizer.state_dict(),
-                        },
-                        os.path.join(
-                            train_config["path"]["ckpt_path"],
-                            "{}.pth.tar".format(step),
-                        ),
-                    )
+                    save_ckpt(train_config["path"]["ckpt_path"], step, epoch, model, optimizer)
+
+                if step == total_step:
+                    # asegúrate de guardar el último aunque no coincida con save_step
+                    if step % save_step != 0:
+                        save_ckpt(train_config["path"]["ckpt_path"], step, epoch, model, optimizer)
+                    return  # mejor que quit()
+
 
                 if step == total_step:
                     quit()

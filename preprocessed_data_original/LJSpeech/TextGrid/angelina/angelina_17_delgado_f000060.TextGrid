@@ -1,0 +1,100 @@
+File type = "ooTextFile"
+Object class = "TextGrid"
+
+xmin = 0 
+xmax = 2.179813 
+tiers? <exists> 
+size = 2 
+item []: 
+    item [1]:
+        class = "IntervalTier" 
+        name = "words" 
+        xmin = 0 
+        xmax = 2.179813 
+        intervals: size = 7 
+        intervals [1]:
+            xmin = 0 
+            xmax = 0.47 
+            text = "" 
+        intervals [2]:
+            xmin = 0.47 
+            xmax = 0.61 
+            text = "-y" 
+        intervals [3]:
+            xmin = 0.61 
+            xmax = 0.8 
+            text = "quien" 
+        intervals [4]:
+            xmin = 0.8 
+            xmax = 0.92 
+            text = "es" 
+        intervals [5]:
+            xmin = 0.92 
+            xmax = 1.1 
+            text = "esa" 
+        intervals [6]:
+            xmin = 1.1 
+            xmax = 1.67 
+            text = "senorita" 
+        intervals [7]:
+            xmin = 1.67 
+            xmax = 2.179813 
+            text = "" 
+    item [2]:
+        class = "IntervalTier" 
+        name = "phones" 
+        xmin = 0 
+        xmax = 2.179813 
+        intervals: size = 13 
+        intervals [1]:
+            xmin = 0 
+            xmax = 0.47 
+            text = "" 
+        intervals [2]:
+            xmin = 0.47 
+            xmax = 0.61 
+            text = "spn" 
+        intervals [3]:
+            xmin = 0.61 
+            xmax = 0.68 
+            text = "k" 
+        intervals [4]:
+            xmin = 0.68 
+            xmax = 0.73 
+            text = "j" 
+        intervals [5]:
+            xmin = 0.73 
+            xmax = 0.77 
+            text = "e" 
+        intervals [6]:
+            xmin = 0.77 
+            xmax = 0.8 
+            text = "n" 
+        intervals [7]:
+            xmin = 0.8 
+            xmax = 0.86 
+            text = "e" 
+        intervals [8]:
+            xmin = 0.86 
+            xmax = 0.92 
+            text = "s" 
+        intervals [9]:
+            xmin = 0.92 
+            xmax = 0.99 
+            text = "e" 
+        intervals [10]:
+            xmin = 0.99 
+            xmax = 1.06 
+            text = "s" 
+        intervals [11]:
+            xmin = 1.06 
+            xmax = 1.1 
+            text = "a" 
+        intervals [12]:
+            xmin = 1.1 
+            xmax = 1.67 
+            text = "spn" 
+        intervals [13]:
+            xmin = 1.67 
+            xmax = 2.179813 
+            text = "" 

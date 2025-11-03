@@ -77,6 +77,24 @@ class VarianceAdaptor(nn.Module):
             n_bins, model_config["transformer"]["encoder_hidden"]
         )
 
+    def _frame_to_phone(self, emb, duration):
+        # emb: (B, L_fr, D), duration: (B, L_ph)
+        B, _, D = emb.size()
+        out = []
+        for b in range(B):
+            vals, pos = [], 0
+            for d in duration[b].tolist():
+                d = int(d)
+                if d > 0:
+                    vals.append(emb[b, pos:pos+d].mean(dim=0))
+                else:
+                    vals.append(torch.zeros(D, device=emb.device, dtype=emb.dtype))
+                pos += d
+            out.append(torch.stack(vals, dim=0))   # (L_ph, D)
+        # pad a L_ph_max y devuelve (B, L_ph_max, D)
+        return torch.nn.utils.rnn.pad_sequence(out, batch_first=True)
+
+
     def get_pitch_embedding(self, x, target, mask, control):
         prediction = self.pitch_predictor(x, mask)
         if target is not None:
@@ -114,16 +132,30 @@ class VarianceAdaptor(nn.Module):
     ):
 
         log_duration_prediction = self.duration_predictor(x, src_mask)
+
         if self.pitch_feature_level == "phoneme_level":
             pitch_prediction, pitch_embedding = self.get_pitch_embedding(
                 x, pitch_target, src_mask, p_control
             )
+            # ⚠️ si por lo que sea vino a frames, colapsa a fonemas:
+            if pitch_embedding.size(1) != x.size(1):
+                if duration_target is None:
+                    raise RuntimeError("Pitch embedding es frame-level y no hay duration_target para colapsar.")
+                pitch_embedding = self._frame_to_phone(pitch_embedding, duration_target)
+                pitch_embedding = pitch_embedding[:, : x.size(1), :]
             x = x + pitch_embedding
+
         if self.energy_feature_level == "phoneme_level":
             energy_prediction, energy_embedding = self.get_energy_embedding(
-                x, energy_target, src_mask, p_control
+                x, energy_target, src_mask, e_control   # ← corrige p_control → e_control
             )
+            if energy_embedding.size(1) != x.size(1):
+                if duration_target is None:
+                    raise RuntimeError("Energy embedding es frame-level y no hay duration_target para colapsar.")
+                energy_embedding = self._frame_to_phone(energy_embedding, duration_target)
+                energy_embedding = energy_embedding[:, : x.size(1), :]
             x = x + energy_embedding
+
 
         if duration_target is not None:
             x, mel_len = self.length_regulator(x, duration_target, max_len)

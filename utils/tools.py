@@ -5,6 +5,8 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import matplotlib
+import numpy as np
+from text.symbols import symbols as SYM
 from scipy.io import wavfile
 from matplotlib import pyplot as plt
 
@@ -14,6 +16,19 @@ matplotlib.use("Agg")
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+_INVALID = '<>:"/\\|?*'
+_TRANS = str.maketrans({c: "_" for c in _INVALID})
+
+def safe_name(name: str, maxlen: int = 120) -> str:
+    s = str(name).translate(_TRANS)
+    # elimina caracteres no imprimibles
+    s = "".join(ch for ch in s if 32 <= ord(ch) < 127)
+    s = s.strip().rstrip(".")         # Windows no permite terminar en espacio o punto
+    if not s:
+        s = "sample"
+    if len(s) > maxlen:
+        s = s[:maxlen]
+    return s
 
 def to_device(data, device):
     if len(data) == 12:
@@ -38,7 +53,7 @@ def to_device(data, device):
         mels = torch.from_numpy(mels).float().to(device)
         mel_lens = torch.from_numpy(mel_lens).to(device)
         pitches = torch.from_numpy(pitches).float().to(device)
-        energies = torch.from_numpy(energies).to(device)
+        energies = torch.from_numpy(energies).float().to(device)
         durations = torch.from_numpy(durations).long().to(device)
 
         return (
@@ -166,6 +181,7 @@ def synth_samples(targets, predictions, vocoder, model_config, preprocess_config
     basenames = targets[0]
     for i in range(len(predictions[0])):
         basename = basenames[i]
+        safe_base = safe_name(basename)
         src_len = predictions[8][i].item()
         mel_len = predictions[9][i].item()
         mel_prediction = predictions[1][i, :mel_len].detach().transpose(0, 1)
@@ -197,13 +213,71 @@ def synth_samples(targets, predictions, vocoder, model_config, preprocess_config
         plt.savefig(os.path.join(path, "{}.png".format(basename)))
         plt.close()
 
-    from .model import vocoder_infer
 
-    mel_predictions = predictions[1].transpose(1, 2)
+    # ===== SUAVIZAR PAUSAS (atenuación + cross-fade) =====
+    mel_pred = predictions[0]
+    postnet_mel = predictions[1]
+    mels = postnet_mel if postnet_mel is not None else mel_pred
+
+    # Normaliza a [B, T, 80]
+    if mels.shape[1] == 80 and mels.shape[-1] != 80:
+        mels = mels.transpose(1, 2).contiguous()
+
+    ids = targets[3].cpu().numpy()                     # [B, L]
+    lens = targets[4].cpu().numpy()                    # [B]
+    durations = predictions[5].long().cpu().numpy()    # [B, L]
+    mels_np = mels.detach().cpu().numpy()              # [B, T, 80]
+
+    # Ajusta aquí la “agresividad” por tipo de pausa:
+    # alpha = 1.0 sería mute total; 0.0 no toca nada.
+    ALPHAS = {
+        '@sil': 0.90,   # silencio "duro"
+        '@sp':  0.70,   # pausa normal (más suave)
+        '@spn': 0.35,   # spoken-noise: apenas atenúa (deja algo de respiración)
+    }
+    EDGE_FRAMES = 6     # longitud del cross-fade en frames (sube/baja suavemente)
+    FLOOR_PCT = 2       # percentil para piso (suelo) de energía del utterance
+
+    from text.symbols import symbols as SYM
+    for b in range(mels_np.shape[0]):
+        L = int(lens[b])
+        toks = [SYM[i] for i in ids[b, :L]]
+        durs = durations[b, :L]
+        floor = float(np.percentile(mels_np[b], FLOOR_PCT))  # suelo ligeramente mayor que el mínimo
+        t0 = 0
+        for tok, d in zip(toks, durs):
+            t1 = t0 + int(d)
+            alpha = ALPHAS.get(tok, None)
+            if alpha is not None and t1 > t0:
+                seg_len = t1 - t0
+                edge = max(1, min(EDGE_FRAMES, seg_len // 4))
+
+                # curva de atenuación: en bordes 0→alpha y alpha→0, centro = alpha
+                w = np.full(seg_len, alpha, dtype=np.float32)
+                if edge > 0:
+                    ramp = np.linspace(0.0, alpha, edge, dtype=np.float32)
+                    w[:edge] = np.maximum(w[:edge], ramp)              # fade-in
+                    w[-edge:] = np.maximum(w[-edge:], ramp[::-1])      # fade-out
+
+                # mezcla: (1 - w)*original + w*floor
+                mels_np[b, t0:t1, :] = (1.0 - w[:, None]) * mels_np[b, t0:t1, :] + (w[:, None]) * floor
+            t0 = t1
+
+    mels_sil = torch.from_numpy(mels_np).to(mels.device)
+    # Vuelve a [B, 80, T] si tu vocoder lo espera así
+    if mels_sil.shape[1] != 80 and mels_sil.shape[-1] == 80:
+        mels_sil = mels_sil.transpose(1, 2).contiguous()
+    # ===== FIN SUAVIZAR PAUSAS =====
+
+    # Usa la mel suavizada para el vocoder
+    from .model import vocoder_infer
+    mel_predictions = mels_sil
     lengths = predictions[9] * preprocess_config["preprocessing"]["stft"]["hop_length"]
     wav_predictions = vocoder_infer(
         mel_predictions, vocoder, model_config, preprocess_config, lengths=lengths
     )
+
+
 
     sampling_rate = preprocess_config["preprocessing"]["audio"]["sampling_rate"]
     for wav, basename in zip(wav_predictions, basenames):

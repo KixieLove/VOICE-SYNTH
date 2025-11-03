@@ -11,7 +11,7 @@ _pad = "_"
 _punctuation = "¡!'(),.:;¿? "
 _special = "-"
 _letters = "ABCDEFGHIJKLMNÑOPQRSTUVWXYZabcdefghijklmnñopqrstuvwxyz"
-_silences = ["@sp", "@spn", "@sil", "@a", "@e", "@i", "@o", "@u","@t̪", "@ð", "@d̪", "@ɾ", "@ŋ", "@ɣ", "@β", "@ɟʝ", "@ɲ", "@ç","@ɡ", "@tʃ","@ɟ","@ʝ","@ʃ"]
+_silences = ["@sp", "@spn", "@sil", "@a", "@e", "@i", "@o", "@u","@t̪", "@ð", "@d̪", "@ɾ", "@ŋ", "@ɣ", "@β", "@ɟʝ", "@ɲ", "@ç","@ɡ", "@tʃ","@ɟ","@ʝ","@ʃ","@θ", "@ʎ"]
 
 # Prepend "@" to ARPAbet symbols to ensure uniqueness (some are the same as uppercase letters):
 _arpabet = ["@" + s for s in cmudict.valid_symbols]
